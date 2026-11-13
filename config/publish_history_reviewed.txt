@@ -1,0 +1,4 @@
+# Files in the git history that the must-not-ship gate (make publish_scan) flags, but that a person checked and found public.
+# One tab-separated line per file: path, full 40-character commit hash, reason naming the reviewer and the date.
+# An entry passes only that path at that commit (no globs). A later commit that changes the file fails again, and an entry
+# whose commit is not in the history of HEAD fails as stale. Lines starting with # are comments.

@@ -1,0 +1,55 @@
+name: Entry request
+description: Ask to enter a chess AI product or model in the benchmark (docs/taking_part.md)
+title: "entry: <entrant name>"
+labels: [entry]
+body:
+  - type: markdown
+    attributes:
+      value: "Read docs/taking_part.md first. **Never paste a key or password here**; a maintainer arranges a private handover once the request is accepted."
+  - type: input
+    id: entrant
+    attributes:
+      label: Entrant name and product
+      description: "Lowercase letters, digits and underscores for the name, e.g. acme_coach (Acme Coach, Pro plan)"
+    validations:
+      required: true
+  - type: dropdown
+    id: path
+    attributes:
+      label: How do we reach it?
+      options:
+        - OpenAI-compatible chat completions endpoint
+        - No API (answers entered by hand)
+        - Other API (needs an adapter)
+    validations:
+      required: true
+  - type: dropdown
+    id: family
+    attributes:
+      label: Declared model family
+      options: [anthropic, openai, google, xai, cursor, undisclosed, none (no language model, spreadsheet only)]
+    validations:
+      required: true
+  - type: checkboxes
+    id: tools
+    attributes:
+      label: Tools the product uses while it answers
+      options:
+        - label: engine
+        - label: web
+        - label: code
+        - label: analysis tools or services
+  - type: dropdown
+    id: affiliated
+    attributes:
+      label: Does Chessify build or run it?
+      options: ["no", "yes"]
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Endpoint and limits
+      description: "Endpoint URL (the full https URL we post to), model id, rate or spending limits, terms we must respect, and a contact for your results before publication"
+    validations:
+      required: true

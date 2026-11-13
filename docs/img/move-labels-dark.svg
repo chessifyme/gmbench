@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 146" width="900" height="146" role="img" aria-labelledby="t d" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif">
+<title id="t">Move labels</title>
+<desc id="d">Move labels by the drop in win probability from the mover's view, in win points: best is the top move or within 2 of it, good up to 5, inaccuracy from 5, mistake from 10, blunder from 15. A drop exactly on a cutoff takes the higher label.</desc>
+<rect x="0.5" y="0.5" width="899" height="145" rx="8" fill="#0d1117" stroke="#30363d"/>
+<text x="40" y="30" font-size="11.5" fill="#9198a1" text-anchor="start" font-weight="600" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">MOVE LABELS · drop in win probability, from the mover's view (win points)</text>
+<rect x="40" y="58" width="78.0952" height="54" fill="#15241b" stroke="#7fc49d" stroke-width="1.5"/>
+<text x="79.0476" y="91" font-size="13" fill="#7fc49d" text-anchor="middle" font-weight="700">best</text>
+<rect x="118.095" y="58" width="117.143" height="54" fill="#151b23" stroke="#656c76" stroke-width="1.5"/>
+<text x="176.667" y="91" font-size="13" fill="#e6edf3" text-anchor="middle" font-weight="700">good</text>
+<rect x="235.238" y="58" width="195.238" height="54" fill="#272013" stroke="#e3b46a" stroke-width="1.5"/>
+<text x="332.857" y="91" font-size="13" fill="#e3b46a" text-anchor="middle" font-weight="700">inaccuracy</text>
+<rect x="430.476" y="58" width="195.238" height="54" fill="#2e1d0f" stroke="#f0a35e" stroke-width="1.5"/>
+<text x="528.095" y="91" font-size="13" fill="#f0a35e" text-anchor="middle" font-weight="700">mistake</text>
+<rect x="625.714" y="58" width="234.286" height="54" fill="#2d1416" stroke="#ff8a80" stroke-width="1.5"/>
+<text x="742.857" y="91" font-size="13" fill="#ff8a80" text-anchor="middle" font-weight="700">blunder</text>
+<line x1="40" y1="112" x2="40" y2="118" stroke="#9198a1"/>
+<text x="40" y="132" font-size="11.5" fill="#9198a1" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">0</text>
+<line x1="118.095" y1="112" x2="118.095" y2="118" stroke="#9198a1"/>
+<text x="118.095" y="132" font-size="11.5" fill="#9198a1" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">2</text>
+<line x1="235.238" y1="112" x2="235.238" y2="118" stroke="#9198a1"/>
+<text x="235.238" y="132" font-size="11.5" fill="#9198a1" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">5</text>
+<line x1="430.476" y1="112" x2="430.476" y2="118" stroke="#9198a1"/>
+<text x="430.476" y="132" font-size="11.5" fill="#9198a1" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">10</text>
+<line x1="625.714" y1="112" x2="625.714" y2="118" stroke="#9198a1"/>
+<text x="625.714" y="132" font-size="11.5" fill="#9198a1" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">15</text>
+<text x="854" y="132" font-size="12.5" fill="#9198a1" text-anchor="end">…</text>
+<text x="40" y="50" font-size="12" fill="#9198a1" text-anchor="start">top move</text>
+<text x="860" y="50" font-size="12" fill="#9198a1" text-anchor="end">larger loss ▶</text>
+<text x="40" y="160" font-size="12" fill="#9198a1" text-anchor="start">best: the top move, or within 2 win points of it. A drop exactly on a cutoff takes the higher label.</text>
+</svg>

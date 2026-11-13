@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 228" width="900" height="228" role="img" aria-labelledby="t d" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif">
+<title id="t">Evaluation bands</title>
+<desc id="d">Evaluation bands in pawns from White's view, mirrored for Black: roughly equal below 0.30, slight edge from 0.30 to 0.70, clear edge from 0.70 to 1.50, large edge from 1.50 to 2.00, winning from 2.00. An edge belongs to the band above it. A band claim holds 15 cp past its edges, so clearly better is accepted from 0.55 to 1.65.</desc>
+<rect x="0.5" y="0.5" width="899" height="227" rx="8" fill="#ffffff" stroke="#d0d7de"/>
+<text x="40" y="30" font-size="11.5" fill="#59636e" text-anchor="start" font-weight="600" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">EVALUATION BANDS · pawns, from White's view; Black's bands mirror White's</text>
+<rect x="400.8" y="58" width="98.4" height="54" fill="#f6f8fa" stroke="#8c959f" stroke-width="1.5"/>
+<text x="450" y="83" font-size="13" fill="#1f2328" text-anchor="middle" font-weight="700">roughly</text>
+<text x="450" y="99" font-size="13" fill="#1f2328" text-anchor="middle" font-weight="700">equal</text>
+<rect x="499.2" y="58" width="65.6" height="54" fill="#e3ecf6" stroke="#1f5a96" stroke-width="1.5"/>
+<text x="532" y="83" font-size="13" fill="#1f2328" text-anchor="middle" font-weight="700">slight</text>
+<text x="532" y="99" font-size="13" fill="#1f2328" text-anchor="middle" font-weight="700">edge</text>
+<rect x="564.8" y="58" width="131.2" height="54" fill="#c5d8ee" stroke="#1f5a96" stroke-width="1.5"/>
+<text x="630.4" y="83" font-size="13" fill="#1f2328" text-anchor="middle" font-weight="700">clear</text>
+<text x="630.4" y="99" font-size="13" fill="#1f2328" text-anchor="middle" font-weight="700">edge</text>
+<rect x="696" y="58" width="82" height="54" fill="#9dbde2" stroke="#1f5a96" stroke-width="1.5"/>
+<text x="737" y="83" font-size="13" fill="#1f2328" text-anchor="middle" font-weight="700">large</text>
+<text x="737" y="99" font-size="13" fill="#1f2328" text-anchor="middle" font-weight="700">edge</text>
+<rect x="778" y="58" width="82" height="54" fill="#1f5a96" stroke="#1f5a96" stroke-width="1.5"/>
+<text x="819" y="91" font-size="13" fill="#ffffff" text-anchor="middle" font-weight="700">winning</text>
+<rect x="335.2" y="58" width="65.6" height="54" fill="#e3ecf6" stroke="#1f5a96" stroke-width="1.5"/>
+<text x="368" y="83" font-size="13" fill="#1f2328" text-anchor="middle" font-weight="700">slight</text>
+<text x="368" y="99" font-size="13" fill="#1f2328" text-anchor="middle" font-weight="700">edge</text>
+<rect x="204" y="58" width="131.2" height="54" fill="#c5d8ee" stroke="#1f5a96" stroke-width="1.5"/>
+<text x="269.6" y="83" font-size="13" fill="#1f2328" text-anchor="middle" font-weight="700">clear</text>
+<text x="269.6" y="99" font-size="13" fill="#1f2328" text-anchor="middle" font-weight="700">edge</text>
+<rect x="122" y="58" width="82" height="54" fill="#9dbde2" stroke="#1f5a96" stroke-width="1.5"/>
+<text x="163" y="83" font-size="13" fill="#1f2328" text-anchor="middle" font-weight="700">large</text>
+<text x="163" y="99" font-size="13" fill="#1f2328" text-anchor="middle" font-weight="700">edge</text>
+<rect x="40" y="58" width="82" height="54" fill="#1f5a96" stroke="#1f5a96" stroke-width="1.5"/>
+<text x="81" y="91" font-size="13" fill="#ffffff" text-anchor="middle" font-weight="700">winning</text>
+<text x="854" y="128" font-size="12.5" fill="#59636e" text-anchor="end">…</text>
+<text x="46" y="128" font-size="12.5" fill="#59636e" text-anchor="start">…</text>
+<line x1="122" y1="112" x2="122" y2="118" stroke="#59636e"/>
+<text x="122" y="132" font-size="11.5" fill="#59636e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">−2.00</text>
+<line x1="204" y1="112" x2="204" y2="118" stroke="#59636e"/>
+<text x="204" y="132" font-size="11.5" fill="#59636e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">−1.50</text>
+<line x1="335.2" y1="112" x2="335.2" y2="118" stroke="#59636e"/>
+<text x="335.2" y="132" font-size="11.5" fill="#59636e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">−0.70</text>
+<line x1="400.8" y1="112" x2="400.8" y2="118" stroke="#59636e"/>
+<text x="400.8" y="132" font-size="11.5" fill="#59636e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">−0.30</text>
+<line x1="450" y1="112" x2="450" y2="118" stroke="#59636e"/>
+<text x="450" y="132" font-size="11.5" fill="#59636e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">0</text>
+<line x1="499.2" y1="112" x2="499.2" y2="118" stroke="#59636e"/>
+<text x="499.2" y="132" font-size="11.5" fill="#59636e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">+0.30</text>
+<line x1="564.8" y1="112" x2="564.8" y2="118" stroke="#59636e"/>
+<text x="564.8" y="132" font-size="11.5" fill="#59636e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">+0.70</text>
+<line x1="696" y1="112" x2="696" y2="118" stroke="#59636e"/>
+<text x="696" y="132" font-size="11.5" fill="#59636e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">+1.50</text>
+<line x1="778" y1="112" x2="778" y2="118" stroke="#59636e"/>
+<text x="778" y="132" font-size="11.5" fill="#59636e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">+2.00</text>
+<text x="40" y="50" font-size="12" fill="#59636e" text-anchor="start">◀ Black better</text>
+<text x="860" y="50" font-size="12" fill="#59636e" text-anchor="end">White better ▶</text>
+<line x1="540.2" y1="158" x2="720.6" y2="158" stroke="#1f5a96" stroke-width="2"/>
+<line x1="540.2" y1="152" x2="540.2" y2="164" stroke="#1f5a96" stroke-width="2"/>
+<line x1="720.6" y1="152" x2="720.6" y2="164" stroke="#1f5a96" stroke-width="2"/>
+<line x1="564.8" y1="138" x2="564.8" y2="158" stroke="#d0d7de" stroke-dasharray="3 3"/>
+<line x1="696" y1="138" x2="696" y2="158" stroke="#d0d7de" stroke-dasharray="3 3"/>
+<text x="530.2" y="162" font-size="12.5" fill="#1f2328" text-anchor="end">“clearly better” holds from +0.55 to +1.65: each band reaches 15 cp past its edges</text>
+<text x="40" y="192" font-size="12" fill="#59636e" text-anchor="start">An edge belongs to the band above it: +0.70 is a clear edge.</text>
+</svg>

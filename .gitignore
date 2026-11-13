@@ -1,0 +1,22 @@
+.env
+*.swp
+*.swo
+.DS_Store
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+/runs/
+*.partial
+/site/
+/pool/
+/calibration/*
+!/calibration/weights_*.json
+/exports/
+data/public/tasks_public.jsonl
+
+# Internal notes stay out of the repository
+/private_notes/
+
+# Server backups of the review app data
+/backups/

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }} · Review</title>
+<script id="theme_boot">(function () { let theme = null; try { theme = localStorage.getItem("review_theme"); } catch (blocked) { console.warn("theme choice unavailable: browser storage is blocked", blocked); } if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme; })();</script>
+<style>{{ css | safe }}</style>{% block head %}{% endblock %}</head>
+<body data-reviewer="{{ reviewer or '' }}">
+<header><a href="/sheets">Tasks</a>
+<span class="hint">{{ progress.complete }} / {{ progress.total }} complete</span><progress value="{{ progress.complete }}" max="{{ progress.total }}"></progress>
+<span class="reviewer-chip">{% if reviewer %}Signed in as <strong id="reviewer_name">{{ reviewer }}</strong>{% if is_adjudicator %} (adjudicator){% endif %}<form method="post" action="/logout" class="inline-form"><button type="submit" class="link-button" id="reviewer_logout">Sign out</button></form>{% else %}<strong id="reviewer_name">Not signed in</strong>: open your personal access link{% endif %}</span>
+<span class="theme-toggle" id="theme_toggle" role="group" aria-label="Theme"><button type="button" data-theme-choice="light" aria-pressed="false">Light</button><button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button><button type="button" data-theme-choice="auto" aria-pressed="true">Auto</button></span>
+</header>
+<main>{% block body %}{% endblock %}</main>
+<dialog id="reviewer_dialog" class="modal">
+<h3>Sign in first</h3>
+<p class="hint">Open your personal access link (the one sent to you) in this browser. It signs you in, so every change you make is saved under your name. Ask a maintainer if you do not have it.</p>
+<div class="modal-actions"><button type="button" id="reviewer_cancel" class="primary">OK</button></div>
+</dialog>
+<script>
+(function () {
+  const root = document.documentElement;
+  const buttons = document.querySelectorAll("#theme_toggle [data-theme-choice]");
+  function show() {
+    const current = root.dataset.theme || "auto";
+    buttons.forEach(function (button) { button.setAttribute("aria-pressed", String(button.dataset.themeChoice === current)); });
+  }
+  buttons.forEach(function (button) {
+    button.addEventListener("click", function () {
+      const choice = button.dataset.themeChoice;
+      if (choice === "auto") { delete root.dataset.theme; } else { root.dataset.theme = choice; }
+      try { if (choice === "auto") { localStorage.removeItem("review_theme"); } else { localStorage.setItem("review_theme", choice); } } catch (blocked) { console.warn("theme not remembered: browser storage is blocked", blocked); }
+      show();
+    });
+  });
+  show();
+})();
+</script>
+<script>
+(function () {
+  // Who is reviewing comes from the personal access link's cookie, never from a typed name.
+  const dialog = document.getElementById("reviewer_dialog");
+  window.reviewerName = function () { return document.body.dataset.reviewer; };
+  window.requireReviewer = function (then) {
+    if (window.reviewerName()) { then(window.reviewerName()); } else { dialog.showModal(); }
+  };
+  document.getElementById("reviewer_cancel").addEventListener("click", function () { dialog.close(); });
+})();
+</script>
+{% block scripts %}{% endblock %}
+</body></html>

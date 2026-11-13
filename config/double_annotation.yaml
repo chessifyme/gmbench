@@ -1,0 +1,5 @@
+# The double-annotation set: tasks that need this many expert reviewers' completed records (each blind to the others) before they
+# count as complete. Every other task needs one. Edit task_ids; the review app, make validate
+# and every consumer of the resolved key (bench.annotations.resolve) read this file.
+required_annotators: 2
+task_ids: []

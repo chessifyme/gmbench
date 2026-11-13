@@ -1,0 +1,230 @@
+{# Every part of the panel keeps a fixed height while the analysis updates its lines several times a second, so the page and the
+board never move: the chips row is one row, each of the analysis_lines lines is two rows (a longer line is clipped; hover shows
+it, a click or Enter opens it over the lines below), and the message line is reserved even when empty. #}
+<section id="analysis_panel" class="analysis" style="--analysis-lines: {{ analysis_lines }}">
+<div class="analysis-head">
+<h3>Analysis</h3>
+<div class="analysis-controls">
+<span id="analysis_state" class="analysis-state">idle</span>
+{# One small toggle: "Analyse" while idle, "Stop" while a run is starting or running. It waits for the board's first position. #}
+<button id="analysis_toggle" type="button" class="analysis-toggle" aria-label="Analyse position" disabled><svg class="analysis-toggle-icon" viewBox="0 0 10 10" aria-hidden="true" focusable="false"><path class="icon-run" d="M2 1 L9 5 L2 9 Z"/><rect class="icon-stop" x="1.5" y="1.5" width="7" height="7" rx="1"/></svg><span class="analysis-toggle-text">Analyse</span></button>
+</div>
+</div>
+<p class="analysis-position">Position: <strong id="analysis_position">–</strong></p>
+<div id="analysis_stats" class="analysis-stats" hidden></div>
+<div class="analysis-body">
+<ol id="analysis_out" class="analysis-lines" hidden></ol>
+<p class="analysis-placeholder">Press Analyse to see the top lines for the position on the board. It follows the board when you move.</p>
+</div>
+<p id="analysis_message" class="analysis-message" hidden></p>
+</section>
+<script>
+(function () {
+  const toggle = document.getElementById("analysis_toggle");
+  const toggleText = toggle.querySelector(".analysis-toggle-text");
+  const state = document.getElementById("analysis_state");
+  const positionLabel = document.getElementById("analysis_position");
+  const stats = document.getElementById("analysis_stats");
+  const out = document.getElementById("analysis_out");
+  const message = document.getElementById("analysis_message");
+  let controller = null;
+  let runId = 0;
+  let position = null;
+
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function setRunning(running) {
+    toggle.dataset.running = String(running);
+    toggleText.textContent = running ? "Stop" : "Analyse";
+    toggle.setAttribute("aria-label", running ? "Stop analysis" : "Analyse position");
+  }
+
+  function setState(name) {
+    state.textContent = name;
+    state.dataset.state = name;
+  }
+
+  function say(text, isError) {
+    message.textContent = text;
+    message.title = text;
+    message.classList.toggle("is-error", Boolean(isError));
+    message.hidden = !text;
+  }
+
+  function chip(label, value) {
+    const node = el("span", "analysis-chip");
+    if (label) node.append(el("span", "analysis-chip-label", label));
+    node.append(el("span", "analysis-chip-value", value));
+    return node;
+  }
+
+  function side(score) {
+    if (score.startsWith("#-") || score.startsWith("-")) return "black";
+    if (score.startsWith("#") || score.startsWith("+")) return "white";
+    return "equal";
+  }
+
+  function movesNode(moves) {
+    const wrap = el("span", "analysis-moves");
+    let group = null;
+    moves.forEach(function (move, index) {
+      if (move.number || group === null) {
+        group = el("span", "analysis-move-group");
+        wrap.append(group, " ");
+        if (move.number) group.append(el("span", "analysis-move-number", move.number));
+      }
+      group.append(el("span", index === 0 ? "analysis-move is-first" : "analysis-move", move.san));
+    });
+    return wrap;
+  }
+
+  function lineText(line) {
+    const parts = line.moves.map(function (move) { return move.number ? move.number + " " + move.san : move.san; });
+    return (line.score ? line.score + "  " : "") + parts.join(" ");
+  }
+
+  // The line opened by a click (or Enter) stays open across updates, by rank, until it is clicked again, Escape is pressed or
+  // the reviewer clicks elsewhere; it opens over the lines below (the last line over the lines above), so nothing else moves.
+  let openRank = null;
+
+  function markOpen() {
+    Array.from(out.children).forEach(function (row) {
+      const open = row.dataset.rank === String(openRank);
+      row.classList.toggle("is-open", open);
+      row.setAttribute("aria-expanded", String(open));
+    });
+  }
+
+  function lineRow(index) {
+    let row = out.children[index];
+    if (!row) {
+      row = el("li", "analysis-line");
+      row.tabIndex = 0;
+      row.setAttribute("role", "button");
+      out.append(row);
+    }
+    return row;
+  }
+
+  function showInfo(info) {
+    const value = function (v, fallback) { return v === null || v === undefined ? fallback : String(v); };
+    stats.replaceChildren(
+      chip("Depth", value(info.depth, "–") + "/" + value(info.seldepth, "–")),
+      chip("", value(info.mnps, "–") + " MN/s"),
+      chip("", info.nodes === null ? "–" : (info.nodes / 1e6).toFixed(1) + "M nodes"),
+      chip("", info.seconds.toFixed(1) + " s"),
+    );
+    stats.hidden = false;
+    // The rows are reused, not rebuilt, so a focused or hovered line keeps its place while the analysis updates it.
+    info.lines.forEach(function (line, index) {
+      const row = lineRow(index);
+      const body = el("span", "analysis-line-body");
+      const score = el("span", "analysis-score", line.score);
+      score.dataset.side = side(line.score);
+      body.append(score, movesNode(line.moves));
+      row.replaceChildren(body);
+      row.dataset.rank = String(line.rank === undefined ? index + 1 : line.rank);
+      row.title = lineText(line);
+    });
+    while (out.children.length > info.lines.length) out.lastElementChild.remove();
+    markOpen();
+    out.hidden = false;
+    say("");
+  }
+
+  function toggleLine(row) {
+    openRank = row.dataset.rank === String(openRank) ? null : row.dataset.rank;
+    markOpen();
+  }
+
+  out.addEventListener("click", function (event) {
+    const row = event.target.closest(".analysis-line");
+    if (row) toggleLine(row);
+  });
+  out.addEventListener("keydown", function (event) {
+    const row = event.target.closest(".analysis-line");
+    if (row && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); toggleLine(row); }
+    if (event.key === "Escape" && openRank !== null) { openRank = null; markOpen(); }
+  });
+  document.addEventListener("click", function (event) {
+    if (openRank !== null && !out.contains(event.target)) { openRank = null; markOpen(); }
+  });
+
+  function finish(id, stateName, text, isError) {
+    if (id !== runId) return;
+    controller = null;
+    setRunning(false);
+    setState(stateName);
+    say(text, isError);
+  }
+
+  function handle(id, block) {
+    if (id !== runId) return;
+    let name = "message", data = "";
+    block.split("\n").forEach(function (line) {
+      if (line.startsWith("event: ")) name = line.slice(7);
+      if (line.startsWith("data: ")) data += line.slice(6);
+    });
+    const payload = data ? JSON.parse(data) : {};
+    if (name === "start") { setState("running"); }
+    if (name === "info") { showInfo(payload); }
+    if (name === "done") { finish(id, "done", "Finished: " + payload.reason + ".", false); }
+    if (name === "error") { finish(id, "error", payload.message, true); }
+  }
+
+  async function start() {
+    if (!position) return;
+    if (controller) controller.abort();
+    runId += 1;
+    const id = runId;
+    const ownController = new AbortController();
+    controller = ownController;
+    setRunning(true);
+    stats.hidden = true;
+    out.hidden = true;
+    out.replaceChildren();
+    openRank = null;
+    setState("starting");
+    say("Starting…");
+    try {
+      const response = await fetch("/analysis/stream?" + new URLSearchParams({ fen: position.fen }), { signal: ownController.signal });
+      if (!response.ok) {
+        const body = await response.json().catch(function () { return {}; });
+        finish(id, "error", body.detail || ("HTTP " + response.status), true);
+        return;
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let cut;
+        while ((cut = buffer.indexOf("\n\n")) >= 0) {
+          handle(id, buffer.slice(0, cut));
+          buffer = buffer.slice(cut + 2);
+        }
+      }
+      finish(id, "done", "", false);
+    } catch (error) {
+      if (error.name === "AbortError") { finish(id, "stopped", "", false); } else { finish(id, "error", "Connection lost: " + error.message, true); }
+    }
+  }
+
+  window.addEventListener("board:position", function (event) {
+    const changed = !position || position.fen !== event.detail.fen;
+    position = event.detail;
+    positionLabel.textContent = position.label;
+    toggle.disabled = false;
+    if (changed && controller) { start(); }
+  });
+
+  toggle.addEventListener("click", function () { if (controller) { controller.abort(); } else { start(); } });
+})();
+</script>

@@ -1,0 +1,32 @@
+GMBench: a chess explanation benchmark for AI (gmbench)
+Copyright (c) 2026 Chessify
+
+The gmbench source code is released under the MIT licence (LICENSE). The task set, grading sheets, reference
+files and published results under data/public/ are released under CC BY 4.0 (data/public/LICENSE). The
+components below have their own licences. Whoever distributes a program that combines gmbench with any of
+them must also follow that component's licence; for the GPL components this means the combined program must
+be distributed under the GPL.
+
+Third-party software used but not included in this repository:
+
+- python-chess (the `chess` package on PyPI), GPL-3.0-or-later: https://github.com/niklasf/python-chess
+  Installed as a Python dependency; gmbench imports it for move legality, FEN/PGN handling and engine I/O.
+- Stockfish 19, GPL-3.0-or-later: https://stockfishchess.org
+  The grading reference. Installed separately (`make setup`), run as a separate process, and not shipped
+  in this repository. Whoever distributes a container image that includes the official sf_19 release binary
+  must also provide the GPL text and the matching source (https://github.com/official-stockfish/Stockfish/tree/sf_19).
+- python-multipart (a Python dependency), Apache-2.0. Anyone redistributing it must keep its licence and NOTICE
+  files.
+
+Third-party software included in this repository (review_app/static/vendor/, each folder keeps its LICENSE):
+
+- chess.js 1.4.0, BSD-2-Clause: https://github.com/jhlywa/chess.js
+- cm-chessboard 8.15.4, MIT: https://github.com/shaack/cm-chessboard
+  Its SVG assets are under CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/), as stated in
+  each file: the chess pieces (assets/pieces/standard.svg) are from Wikimedia Commons, by Cburnett and
+  Rfc1394, modified by Stefan Haack; the markers (assets/extensions/markers/markers.svg) are by Stefan Haack.
+
+The other Python dependencies (pydantic, pydantic-settings, PyYAML, httpx, fastapi,
+uvicorn, Jinja2, openpyxl, numpy, Markdown) are under permissive licences (MIT, BSD and similar) that ask only that
+their notices be kept when they are redistributed. Of their own dependencies, certifi (installed through httpx)
+is under MPL-2.0, which asks that its source stay available when it is redistributed.
