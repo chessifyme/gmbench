@@ -6,7 +6,7 @@ from typing import Any, Literal, TypeVar
 from urllib.parse import urlsplit
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError, create_model, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from bench.errors import UserError
@@ -172,6 +172,31 @@ def _is_local_host(host: str) -> bool:
     return host in ("localhost", "127.0.0.1", "::1") or host.endswith(".localhost")
 
 
+def checked_entrant_url(*, value: str) -> str:
+    """An entrant's full endpoint, posted to exactly as given: https, or plain http for a server on this machine, with no
+    credentials, query or fragment."""
+    parts = urlsplit(value)
+    if parts.scheme not in ("https", "http") or not parts.hostname:
+        raise ValueError("url must be an https:// URL, or http:// for a server on this machine")
+    if parts.scheme == "http" and not _is_local_host(parts.hostname):
+        raise ValueError("url may use plain http only for localhost; a remote endpoint needs https")
+    if parts.username or parts.password or parts.query or parts.fragment:
+        raise ValueError("url must carry no credentials, query or fragment: a key goes in .env, never in the URL")
+    return value
+
+
+class _EntrantEnv(BaseSettings):
+    model_config = SettingsConfigDict(env_file=ROOT / ".env", env_file_encoding="utf-8", extra="ignore")
+
+
+def entrant_env_value(*, variable: str, env_file: Path = ROOT / ".env") -> SecretStr | None:
+    """One variable an entrant file names in a header (${VARIABLE}), from the environment or .env by the settings mechanism; None
+    when it is unset or blank. The caller keeps it secret: never logged, never written to a record."""
+    settings = create_model("EntrantHeaderEnv", __base__=_EntrantEnv, value=(SecretStr | None, Field(default=None, validation_alias=variable)))
+    value = settings(_env_file=env_file).value  # type: ignore[call-arg, attr-defined]
+    return value if value is not None and value.get_secret_value().strip() else None
+
+
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -191,15 +216,7 @@ class HttpEntrant(StrictModel):
     @field_validator("url")
     @classmethod
     def _https_or_local_http(cls, value: str) -> str:
-        """The full endpoint, posted to exactly as given."""
-        parts = urlsplit(value)
-        if parts.scheme not in ("https", "http") or not parts.hostname:
-            raise ValueError("url must be an https:// URL, or http:// for a server on this machine")
-        if parts.scheme == "http" and not _is_local_host(parts.hostname):
-            raise ValueError("url may use plain http only for localhost; a remote endpoint needs https")
-        if parts.username or parts.password or parts.query or parts.fragment:
-            raise ValueError("url must carry no credentials, query or fragment: a key goes in .env, never in the URL")
-        return value
+        return checked_entrant_url(value=value)
 
 
 class ThirdPartyConfig(StrictModel):

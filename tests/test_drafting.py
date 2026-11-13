@@ -108,7 +108,7 @@ def test_a_draft_holds_the_engines_claims_only_weighted_and_true_by_source() -> 
     assert any(k.kind == "best_move" and k.move == "Na5" and k.weight == 2 for k in lost.claims)
     assert any(k.kind == "eval_band" for k in sheet.claims)
     assert sheet.author is None and sheet.notes == "" and sheet.turning_points == []
-    assert sheet.answer_key == sheet.claims and [c.claim_id for c in sheet.claims] == [f"mj_9001_c{n:03d}" for n in range(1, len(sheet.claims) + 1)]
+    assert sheet.expert_points == sheet.claims and [c.claim_id for c in sheet.claims] == [f"mj_9001_c{n:03d}" for n in range(1, len(sheet.claims) + 1)]
     assert {(c.source.type, c.source.name, c.source.answer_ref) for c in sheet.claims} == {("engine", "stockfish_19", None)} and all(c.labels == [] for c in sheet.claims)
 
 

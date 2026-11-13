@@ -362,7 +362,7 @@
     if (!group) return false;
     if (!weightAllowed(card)) {
       group.classList.remove("refused"); void group.offsetWidth; group.classList.add("refused");
-      group.title = "Label this claim True before putting it in the answer key";
+      group.title = "Label this claim True before making it an expert point";
       return false;
     }
     card.querySelector('input[name="claim_weight"]').value = value;

@@ -187,17 +187,17 @@ def san_key(*, san: str) -> str:
 
 
 FINISHED_WORK: Severity = "warning"
-"""The checks of finished work (an empty answer key, compound claims, a beginner line's length, the verdict
+"""The checks of finished work (empty expert points, compound claims, a beginner line's length, the verdict
 against the claims and the question, a missing verdict, a game review key of turning points only, the band tag of a model's or
 a reviewer's key claim that the reference contradicts) warn at every status: a
 grandmaster completes a task without them, so a completed review never makes the data fail validation (the maintainers'
-import of reviews refuses a folder that does). The grader refuses an empty answer key on its own (assert_gradable_key)."""
+import of reviews refuses a folder that does). The grader refuses empty expert points on its own (assert_gradable_key)."""
 
 
 def _text_problems(*, sheet: Sheet, task: Task, path: Path) -> list[Problem]:
     severity = FINISHED_WORK
     problems: list[Problem] = []
-    for claim in sheet.answer_key:
+    for claim in sheet.expert_points:
         compound = single_claim_problem(text=claim.text)
         if compound is not None:
             problems.append(Problem(path=path, message=f"claim {claim.claim_id} is compound: {compound}", severity=severity))
@@ -205,7 +205,7 @@ def _text_problems(*, sheet: Sheet, task: Task, path: Path) -> list[Problem]:
             plies = len(claim.line.split())
             if plies > MAX_BEGINNER_LINE_PLIES:
                 problems.append(Problem(path=path, message=f"claim {claim.claim_id} line has {plies} plies, a beginner task allows {MAX_BEGINNER_LINE_PLIES}", severity=severity))
-    if not sheet.answer_key:
+    if not sheet.expert_points:
         problems.append(Problem(path=path, message="the answer key is empty: every family scores coverage on it, so weight at least one true claim", severity=severity))
     for claim in sheet.claims:
         if claim.needs_adjudication:
@@ -232,7 +232,7 @@ def verdict_problems(*, sheet: Sheet, task: Task, path: Path) -> list[Problem]:
     played = san_key(san=task.move)
     severity = FINISHED_WORK
     problems: list[Problem] = []
-    for claim in sheet.answer_key:
+    for claim in sheet.expert_points:
         best_move = claim.kind == "best_move" and claim.about == "task_position" and claim.move is not None
         names_task_move = best_move and san_key(san=claim.move or "") == played
         if sheet.verdict not in ("best", "good") and names_task_move:
@@ -254,7 +254,7 @@ def _analysis_for(*, reference: Reference, about: About) -> PositionAnalysis | N
 
 def reference_problems(*, sheet: Sheet, task: Task, reference: Reference, bands: EvalBands, path: Path) -> list[Problem]:
     problems: list[Problem] = []
-    for check in sheet.answer_key:
+    for check in sheet.expert_points:
         label = f"claim {check.claim_id}"
         if check.kind != "eval_band" or check.about is None or (check.about == "after_move" and task.move is None):
             continue
@@ -286,10 +286,10 @@ def _reference_line_for(*, sans: list[str], task: Task, reference: Reference) ->
 
 
 def engine_line_problems(*, sheet: Sheet, task: Task, reference: Reference, bands: EvalBands, path: Path) -> list[Problem]:
-    """An engine line claim in the answer key must still have the outcome the drafter reads off its reference line under the
+    """An engine line claim among the expert points must still have the outcome the drafter reads off its reference line under the
     current evaluation bands (a moved edge can turn "keeps the balance" or "leads to a winning position" into no outcome or another)."""
     problems: list[Problem] = []
-    for check in sheet.answer_key:
+    for check in sheet.expert_points:
         if check.kind != "line_outcome" or check.source.type != "engine" or not check.line or task.fen is None:
             continue
         sans = check.line.split()
@@ -310,7 +310,7 @@ def reworded_tag_problems(*, stored: Sheet, key: Sheet, task: Task, reference: R
     fields for the new wording."""
     drafted = {c.claim_id: c for c in stored.claims}
     problems: list[Problem] = []
-    for check in key.answer_key:
+    for check in key.expert_points:
         old = drafted.get(check.claim_id)
         if old is None or check.text == old.text or not check.checkable or claim_fields(claim=check) != claim_fields(claim=old) or check.about is None:
             continue
@@ -357,7 +357,7 @@ def turning_claim_problems(*, sheet: Sheet, task: Task, path: Path) -> list[Prob
     for point in sheet.turning_points:
         named = move_label(ply_before=point.ply - 1, san=point.move)
         pattern = re.compile(rf"(?<![\w.]){re.escape(named)}(?![\w])")
-        for claim in sheet.answer_key:
+        for claim in sheet.expert_points:
             if not pattern.search(claim.text):
                 continue
             words = {found.lower() for found in TURNING_WORD.findall(claim.text)}
@@ -398,10 +398,10 @@ def sheet_problems(*, sheet: Sheet, task: Task, path: Path, reference: Reference
     if task.status == "signed" and (sheet.author is None or sheet.signed_at is None):
         problems.append(Problem(path=path, message="task is signed but the sheet lacks author or signed_at"))
     if task.family == "game_review":
-        explained = [c for c in sheet.answer_key if not (c.kind == "other" and c.source.type == "engine")]
+        explained = [c for c in sheet.expert_points if not (c.kind == "other" and c.source.type == "engine")]
         if task.status in ("reviewed", "signed") and not explained:
             problems.append(Problem(path=path, message="a reviewed game_review answer key needs a weighted claim besides the turning-point claims; otherwise coverage only repeats the turning-point score", severity=FINISHED_WORK))
-        for claim in sheet.answer_key:
+        for claim in sheet.expert_points:
             if claim.checkable:
                 problems.append(Problem(path=path, message=f"claim {claim.claim_id} is of the checkable kind {claim.kind}, but a game_review answer key is decided by the jury alone, so it weights no claim of a checkable kind"))
         problems.extend(_turning_point_problems(sheet=sheet, task=task, path=path))
@@ -425,7 +425,7 @@ def warnings_of(*, problems: list[Problem]) -> list[Problem]:
 
 
 def _needs_reference(*, sheet: Sheet) -> bool:
-    return any(c.checkable for c in sheet.answer_key)
+    return any(c.checkable for c in sheet.expert_points)
 
 
 def move_judgement_quota_problems(*, tasks: dict[str, Task], sheets: dict[str, Sheet], shares: dict[str, float], path: Path) -> list[Problem]:

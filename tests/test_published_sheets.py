@@ -10,11 +10,22 @@ from bench.annotations import annotator_view, per_annotator_sheet, read_double_a
 from bench.io_yaml import read_sheet, yaml_files
 from bench.models import Adjudication, ClaimLabel, RecordWeight, Sheet
 from bench.paths import DATA_PUBLIC, ROOT
-from bench.published_sheets import Pseudonyms, PublishError, key_content, name_problems, pseudonymised, pseudonyms_in_use, published_sheet, reviewer_names
+from bench.published_sheets import (
+    Pseudonyms,
+    PublishError,
+    key_content,
+    name_problems,
+    pseudonymised,
+    pseudonyms_in_use,
+    published_key_content,
+    published_sheet,
+    reviewer_names,
+    unpublished_claim_ids,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 T0 = datetime(2026, 11, 1, 12, 30, tzinfo=UTC)
-PUBLIC_SHEETS = yaml_files(directory=DATA_PUBLIC / "sheets")
+PUBLIC_SHEETS = yaml_files(directory=DATA_PUBLIC / "expert_points")
 
 
 
@@ -116,7 +127,7 @@ def test_pseudonyms_past_z_take_two_letters(tmp_path: Path) -> None:
 
 
 def test_the_pseudonyms_in_use_are_read_from_the_public_sheets() -> None:
-    assert pseudonyms_in_use(sheets_dir=DATA_PUBLIC / "sheets") == {"Expert A", "Expert B", "Expert C"}
+    assert pseudonyms_in_use(sheets_dir=DATA_PUBLIC / "expert_points") == {"Expert A", "Expert B", "Expert C"}
 
 
 def test_a_reviewer_whose_unfinished_record_the_published_form_leaves_out_gets_no_pseudonym_and_no_letter(tmp_path: Path) -> None:
@@ -131,7 +142,7 @@ def test_a_reviewer_whose_unfinished_record_the_published_form_leaves_out_gets_n
     assert "Tester" not in published.model_dump_json() and reviewer_names(sheet=published) <= {"Expert A", "Expert B"}
 
 
-def test_the_published_form_names_a_model_source_only_as_an_ai_model_without_its_run_and_gives_pipeline_drops_a_neutral_comment(tmp_path: Path) -> None:
+def test_the_published_form_names_a_model_source_only_as_an_ai_model_without_its_run_and_gives_a_cleanup_drop_a_neutral_comment(tmp_path: Path) -> None:
     from bench.models import CAP_ANNOTATOR, ClaimDrop, ClaimSource
 
     sheet = per_annotator_sheet(sheet=read_sheet(path=FIXTURES / "sheets" / "ap_9001.yaml"))
@@ -143,11 +154,11 @@ def test_the_published_form_names_a_model_source_only_as_an_ai_model_without_its
     claims = [c.model_copy(update={"source": model, "dropped": drops[c.claim_id], "weight": None}) if c.claim_id in drops else c for c in sheet.claims]
     published = published_sheet(sheet=sheet.model_copy(update={"claims": claims}), required=1, pseudonyms=Pseudonyms(path=tmp_path / "pseudonyms.yaml"))
     by_id = {c.claim_id: c for c in published.claims}
-    assert by_id["ap_9001_c002"].source == ClaimSource(type="model", name="ai_model", answer_ref=None)
+    assert by_id["ap_9001_c003"].source == ClaimSource(type="model", name="ai_model", answer_ref=None)
     others = [c for c in sheet.claims if c.source.type != "model" and c.claim_id not in drops]
     assert others and all(by_id[c.claim_id].source.type == c.source.type and by_id[c.claim_id].source.name != "ai_model" for c in others)
     assert all(by_id[c.claim_id].source == c.source.model_copy(update={"answer_ref": None}) for c in others if c.source.type == "engine")
-    assert by_id["ap_9001_c002"].dropped is not None and by_id["ap_9001_c002"].dropped.comment == "set aside: over the review limit"
+    assert "ap_9001_c002" not in by_id, "a model claim set aside unreviewed over the review limit is not published"
     assert by_id["ap_9001_c003"].dropped is not None and by_id["ap_9001_c003"].dropped.comment == "not a chess claim"
 
 
@@ -158,3 +169,41 @@ def test_the_published_form_keeps_a_same_idea_link_and_its_key_names_it(tmp_path
     assert next(c for c in published.claims if c.claim_id == "ap_9001_c003").same_idea_as == "ap_9001_c001"
     content = key_content(resolution=resolve(sheet=published, required=1))
     assert [c["same_idea_as"] for c in content["claims"]] == [None, None, "ap_9001_c001"]  # type: ignore[index, union-attr]
+
+
+def _set_aside(*, sheet: Sheet, claim_id: str) -> Sheet:
+    from bench.models import CAP_ANNOTATOR, ClaimDrop
+
+    drop = ClaimDrop(annotator=CAP_ANNOTATOR, comment="over the review cap", at=T0)
+    return sheet.model_copy(update={"claims": [c.model_copy(update={"dropped": drop, "weight": None, "labels": []}) if c.claim_id == claim_id else c for c in sheet.claims]})
+
+
+def _duplicate(*, sheet: Sheet, claim_id: str, of: str, number: int) -> Sheet:
+    """`sheet` with an unlabelled, unweighted model claim, a copy of `claim_id`'s text, marked a duplicate of `of`."""
+    from bench.models import ClaimSource
+
+    source = next(c for c in sheet.claims if c.claim_id == claim_id)
+    copy = source.model_copy(update={"claim_id": f"ap_9001_c{number:03d}", "source": ClaimSource(type="model", name="some_model", answer_ref=None), "labels": [], "weight": None, "dropped": None, "duplicate_of": of})
+    return Sheet.model_validate({**sheet.model_dump(), "claims": [*(c.model_dump() for c in sheet.claims), copy.model_dump()], "last_claim_number": max(sheet.last_claim_number, number)})
+
+
+def test_a_claim_set_aside_unreviewed_and_its_unreviewed_duplicates_are_not_published_and_the_rest_keep_their_ids(tmp_path: Path) -> None:
+    sheet = per_annotator_sheet(sheet=read_sheet(path=FIXTURES / "sheets" / "ap_9001.yaml"))
+    aside = _set_aside(sheet=sheet, claim_id="ap_9001_c002")
+    duplicated = _duplicate(sheet=_duplicate(sheet=aside, claim_id="ap_9001_c002", of="ap_9001_c002", number=50), claim_id="ap_9001_c002", of="ap_9001_c002", number=51)
+    assert unpublished_claim_ids(sheet=duplicated) == {"ap_9001_c002", "ap_9001_c050", "ap_9001_c051"}
+    published = published_sheet(sheet=duplicated, required=1, pseudonyms=Pseudonyms(path=tmp_path / "pseudonyms.yaml"))
+    kept = [c.claim_id for c in duplicated.claims if c.claim_id not in {"ap_9001_c002", "ap_9001_c050", "ap_9001_c051"}]
+    assert [c.claim_id for c in published.claims] == kept and published.last_claim_number == duplicated.last_claim_number
+
+
+def test_a_reviewed_claim_that_points_at_a_claim_set_aside_unreviewed_stops_the_publication(tmp_path: Path) -> None:
+    sheet = per_annotator_sheet(sheet=read_sheet(path=FIXTURES / "sheets" / "ap_9001.yaml"))
+    aside = _set_aside(sheet=sheet, claim_id="ap_9001_c002")
+    duplicate = _duplicate(sheet=aside, claim_id="ap_9001_c002", of="ap_9001_c002", number=50)
+    weighted = duplicate.model_copy(update={"claims": [c.model_copy(update={"weight": 1}) if c.claim_id == "ap_9001_c050" else c for c in duplicate.claims]})
+    labelled = duplicate.model_copy(update={"claims": [c.model_copy(update={"labels": [ClaimLabel(annotator="GM Test", value="false", comment="", at=T0)]}) if c.claim_id == "ap_9001_c050" else c for c in duplicate.claims]})
+    idea = aside.model_copy(update={"claims": [c.model_copy(update={"same_idea_as": "ap_9001_c002"}) if c.claim_id == "ap_9001_c003" else c for c in aside.claims]})
+    for bad in (weighted, labelled, idea):
+        with pytest.raises(PublishError, match="set aside unreviewed"):
+            unpublished_claim_ids(sheet=bad)

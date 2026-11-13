@@ -224,7 +224,7 @@ def judge_item(*, item_text: str, answer_text: str, task: Task, panel: dict[str,
 
 
 def audience_credit(*, votes: list[AudienceVote], jury_size: int) -> float | None:
-    """The mean credit of the valid votes, when the whole panel voted and more than half of it validly (as an answer-key
+    """The mean credit of the valid votes, when the whole panel voted and more than half of it validly (as an expert-point
     decision needs a majority); else uncertain (None)."""
     valid = [v for v in votes if v.vote != "invalid"]
     if len(votes) != jury_size or 2 * len(valid) <= jury_size:

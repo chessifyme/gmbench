@@ -9,6 +9,7 @@ __pycache__/
 /runs/
 *.partial
 /site/
+/site_explorer/
 /pool/
 /calibration/*
 !/calibration/weights_*.json

@@ -13,7 +13,7 @@ GRADER = "g1"
 @pytest.fixture
 def tree(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
-    for directory in ("bench/prompts", "bench/grading", "config", "data/public/tasks", "data/public/sheets", "data/public/reference"):
+    for directory in ("bench/prompts", "bench/grading", "config", "data/public/tasks", "data/public/expert_points", "data/public/reference"):
         (root / directory).mkdir(parents=True)
     (root / "pyproject.toml").write_text("[project]\nname = 'bench'\n", encoding="utf-8")
     (root / "uv.lock").write_text("version = 1\n", encoding="utf-8")
@@ -27,18 +27,18 @@ def tree(tmp_path: Path) -> Path:
     (root / "config" / "third_party.yaml").write_text("entrants: {}\n", encoding="utf-8")
     (root / "config" / "other.yaml").write_text("unregistered: true\n", encoding="utf-8")
     (root / "data" / "public" / "tasks" / "ap_0001.yaml").write_text("task_id: ap_0001\n", encoding="utf-8")
-    (root / "data" / "public" / "sheets" / "ap_0001.yaml").write_text("task_id: ap_0001\n", encoding="utf-8")
+    (root / "data" / "public" / "expert_points" / "ap_0001.yaml").write_text("task_id: ap_0001\n", encoding="utf-8")
     subprocess.run(["git", "init", "-q"], cwd=root, check=True)
     subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty", "-m", "init"], cwd=root, check=True)
     return root
 
 
 def _build(root: Path) -> Registration:
-    return build_registration(root=root, tasks_dir=root / "data" / "public" / "tasks", sheets_dir=root / "data" / "public" / "sheets", dataset_version=VERSION, grader_version=GRADER)
+    return build_registration(root=root, tasks_dir=root / "data" / "public" / "tasks", sheets_dir=root / "data" / "public" / "expert_points", dataset_version=VERSION, grader_version=GRADER)
 
 
 def _problems(root: Path, registrations: Path) -> list[str]:
-    return registration_problems(root=root, tasks_dir=root / "data" / "public" / "tasks", sheets_dir=root / "data" / "public" / "sheets", dataset_version=VERSION, grader_version=GRADER, registrations_dir=registrations)[1]
+    return registration_problems(root=root, tasks_dir=root / "data" / "public" / "tasks", sheets_dir=root / "data" / "public" / "expert_points", dataset_version=VERSION, grader_version=GRADER, registrations_dir=registrations)[1]
 
 
 def test_manifest_hashes_every_governed_file_and_a_combined_digest(tree: Path) -> None:
@@ -49,8 +49,8 @@ def test_manifest_hashes_every_governed_file_and_a_combined_digest(tree: Path) -
         "config/bench.yaml",
         "config/models.yaml",
         "config/third_party.yaml",
+        "data/public/expert_points/ap_0001.yaml",
         "data/public/reference/ap_0001.json",
-        "data/public/sheets/ap_0001.yaml",
         "data/public/tasks/ap_0001.yaml",
         "pyproject.toml",
         "uv.lock",
@@ -86,10 +86,10 @@ def test_a_replaced_registration_stays_listed_in_the_registration_history(tree: 
 
 
 def test_missing_manifest_is_reported(tree: Path) -> None:
-    registration, problems = registration_problems(root=tree, tasks_dir=tree / "data" / "public" / "tasks", sheets_dir=tree / "data" / "public" / "sheets", dataset_version=VERSION, grader_version=GRADER, registrations_dir=tree / "registrations")
+    registration, problems = registration_problems(root=tree, tasks_dir=tree / "data" / "public" / "tasks", sheets_dir=tree / "data" / "public" / "expert_points", dataset_version=VERSION, grader_version=GRADER, registrations_dir=tree / "registrations")
     assert registration is None and "no pre-registration manifest" in problems[0]
     with pytest.raises(RegistrationError, match="make preregister"):
-        verify_registration(root=tree, tasks_dir=tree / "data" / "public" / "tasks", sheets_dir=tree / "data" / "public" / "sheets", dataset_version=VERSION, grader_version=GRADER, registrations_dir=tree / "registrations")
+        verify_registration(root=tree, tasks_dir=tree / "data" / "public" / "tasks", sheets_dir=tree / "data" / "public" / "expert_points", dataset_version=VERSION, grader_version=GRADER, registrations_dir=tree / "registrations")
 
 
 def test_matching_manifest_verifies_and_returns_the_combined_digest(tree: Path) -> None:
@@ -99,7 +99,7 @@ def test_matching_manifest_verifies_and_returns_the_combined_digest(tree: Path) 
     registration = _build(tree)
     write_registration(registration=registration, registrations_dir=registrations)
     assert _problems(tree, registrations) == []
-    digest = verify_registration(root=tree, tasks_dir=tree / "data" / "public" / "tasks", sheets_dir=tree / "data" / "public" / "sheets", dataset_version=VERSION, grader_version=GRADER, registrations_dir=registrations)
+    digest = verify_registration(root=tree, tasks_dir=tree / "data" / "public" / "tasks", sheets_dir=tree / "data" / "public" / "expert_points", dataset_version=VERSION, grader_version=GRADER, registrations_dir=registrations)
     assert digest == registration.combined_sha256
 
 
@@ -107,7 +107,7 @@ def test_matching_manifest_verifies_and_returns_the_combined_digest(tree: Path) 
     ("edit", "expected"),
     [
         (lambda r: (r / "bench" / "grading" / "score.py").write_text("X = 2\n", encoding="utf-8"), "changed since registration: bench/grading/score.py"),
-        (lambda r: (r / "data" / "public" / "sheets" / "ap_0001.yaml").write_text("task_id: ap_0001\nnotes: x\n", encoding="utf-8"), "data/public/sheets/ap_0001.yaml"),
+        (lambda r: (r / "data" / "public" / "expert_points" / "ap_0001.yaml").write_text("task_id: ap_0001\nnotes: x\n", encoding="utf-8"), "data/public/expert_points/ap_0001.yaml"),
         (lambda r: (r / "data" / "public" / "tasks" / "ap_0002.yaml").write_text("task_id: ap_0002\n", encoding="utf-8"), "not registered: data/public/tasks/ap_0002.yaml"),
         (lambda r: (r / "bench" / "prompts" / "judge_item.md").unlink(), "registered but gone: bench/prompts/judge_item.md"),
     ],
@@ -123,7 +123,7 @@ def test_any_change_to_a_registered_file_is_a_mismatch(tree: Path, edit, expecte
 def test_version_mismatch_and_hand_edited_manifest_are_reported(tree: Path) -> None:
     registrations = tree / "registrations"
     path = write_registration(registration=_build(tree), registrations_dir=registrations)
-    assert any("grader g1" in p for p in registration_problems(root=tree, tasks_dir=tree / "data" / "public" / "tasks", sheets_dir=tree / "data" / "public" / "sheets", dataset_version=VERSION, grader_version="g2", registrations_dir=registrations)[1])
+    assert any("grader g1" in p for p in registration_problems(root=tree, tasks_dir=tree / "data" / "public" / "tasks", sheets_dir=tree / "data" / "public" / "expert_points", dataset_version=VERSION, grader_version="g2", registrations_dir=registrations)[1])
     path.write_text(path.read_text(encoding="utf-8").replace("X", "Y"), encoding="utf-8")
     forged = Registration.model_validate_json(path.read_text(encoding="utf-8"))
     forged = forged.model_copy(update={"combined_sha256": "0" * 64})
@@ -145,7 +145,7 @@ def test_a_private_run_is_refused_without_a_matching_manifest(tmp_path: Path, mo
 def test_calibrated_weights_are_registered_and_required_for_official_runs(tree: Path) -> None:
     registrations = tree / "registrations"
     write_registration(registration=_build(tree), registrations_dir=registrations)
-    kwargs = {"root": tree, "tasks_dir": tree / "data" / "public" / "tasks", "sheets_dir": tree / "data" / "public" / "sheets", "dataset_version": VERSION, "grader_version": GRADER, "registrations_dir": registrations}
+    kwargs = {"root": tree, "tasks_dir": tree / "data" / "public" / "tasks", "sheets_dir": tree / "data" / "public" / "expert_points", "dataset_version": VERSION, "grader_version": GRADER, "registrations_dir": registrations}
     assert registration_problems(**kwargs)[1] == []
     _, problems = registration_problems(**kwargs, require_weights=True)
     assert any("calibration/weights_pilot.json" in p and "missing" in p for p in problems)
@@ -172,7 +172,7 @@ def test_a_private_set_has_its_own_manifest_bound_to_its_own_tasks_and_sheets(tr
     assert write_registration(registration=registration, registrations_dir=registrations) == registrations / "pilot_private.json"
     kwargs = {"root": tree, "tasks_dir": private / "tasks", "sheets_dir": private / "sheets", "dataset_version": VERSION, "grader_version": GRADER, "registrations_dir": registrations, "task_set": "private"}
     assert registration_problems(**kwargs)[1] == []
-    _, wrong_set = registration_problems(**{**kwargs, "task_set": "public", "tasks_dir": tree / "data" / "public" / "tasks", "sheets_dir": tree / "data" / "public" / "sheets"})
+    _, wrong_set = registration_problems(**{**kwargs, "task_set": "public", "tasks_dir": tree / "data" / "public" / "tasks", "sheets_dir": tree / "data" / "public" / "expert_points"})
     assert any("no pre-registration manifest" in p for p in wrong_set)
     (private / "sheets" / "ap_0101.yaml").write_text("task_id: ap_0101\nnotes: edited\n", encoding="utf-8")
     assert any("changed since registration: private/sheets/ap_0101.yaml" in p for p in registration_problems(**kwargs)[1])
@@ -218,9 +218,9 @@ def test_git_dirty_sees_uncommitted_changes_to_governed_paths_only(tree: Path) -
     assert git_dirty(root=tree, paths=paths) is False
     (tree / "README.md").write_text("changed\n", encoding="utf-8")
     assert git_dirty(root=tree, paths=paths) is False
-    (tree / "data" / "public" / "sheets" / "ap_0002.yaml").write_text("task_id: ap_0002\n", encoding="utf-8")
+    (tree / "data" / "public" / "expert_points" / "ap_0002.yaml").write_text("task_id: ap_0002\n", encoding="utf-8")
     assert git_dirty(root=tree, paths=paths) is True
-    (tree / "data" / "public" / "sheets" / "ap_0002.yaml").unlink()
+    (tree / "data" / "public" / "expert_points" / "ap_0002.yaml").unlink()
     (tree / "config" / "bench.yaml").write_text("dataset_version: other\n", encoding="utf-8")
     assert git_dirty(root=tree, paths=paths) is True
     subprocess.run(["git", "checkout", "--", "config/bench.yaml"], cwd=tree, check=True)
@@ -239,7 +239,7 @@ def test_git_dirty_sees_uncommitted_changes_to_governed_paths_only(tree: Path) -
 
 def test_hand_set_weights_register_and_are_recorded_as_hand_set(tree: Path) -> None:
     registrations = tree / "registrations"
-    kwargs = {"root": tree, "tasks_dir": tree / "data" / "public" / "tasks", "sheets_dir": tree / "data" / "public" / "sheets", "dataset_version": VERSION, "grader_version": GRADER, "registrations_dir": registrations}
+    kwargs = {"root": tree, "tasks_dir": tree / "data" / "public" / "tasks", "sheets_dir": tree / "data" / "public" / "expert_points", "dataset_version": VERSION, "grader_version": GRADER, "registrations_dir": registrations}
     assert _build(tree).weights_source is None
     (tree / "config" / "bench.yaml").write_text("dataset_version: pilot\ncalibration:\n  hand_set_weights: [pilot]\n", encoding="utf-8")
     registration = _build(tree)
@@ -259,7 +259,7 @@ def test_hand_set_weights_for_another_version_do_not_satisfy_an_official_registr
     registrations = tree / "registrations"
     write_registration(registration=_build(tree), registrations_dir=registrations)
     with pytest.raises(RegistrationError, match="hand_set_weights"):
-        verify_registration(root=tree, tasks_dir=tree / "data" / "public" / "tasks", sheets_dir=tree / "data" / "public" / "sheets", dataset_version=VERSION, grader_version=GRADER, registrations_dir=registrations)
+        verify_registration(root=tree, tasks_dir=tree / "data" / "public" / "tasks", sheets_dir=tree / "data" / "public" / "expert_points", dataset_version=VERSION, grader_version=GRADER, registrations_dir=registrations)
 
 
 def test_a_private_file_is_listed_apart_so_the_public_tree_checks_the_rest_and_recomputes_their_combined_digest(tree: Path, monkeypatch: pytest.MonkeyPatch) -> None:

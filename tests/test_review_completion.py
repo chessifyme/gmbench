@@ -151,7 +151,7 @@ def test_the_grandmaster_sees_no_check_but_the_comment_rule_and_completes_with_o
     assert "claims in the key" not in saved and "more than one thing" not in saved and "card-warning\">" not in saved
     assert client.post("/sheets/ap_9001/complete", data={"reviewer": "Aram"}, follow_redirects=False).status_code == 303
     resolved = resolve(sheet=read_sheet(path=path), required=1)
-    assert len(resolved.sheet.answer_key) > 8
+    assert len(resolved.sheet.expert_points) > 8
     problems = validate_all(tasks_dir=data / "tasks", sheets_dir=data / "sheets")
     assert errors_of(problems=problems) == [], "a grandmaster's completion never fails validation"
     warned = [p.message for p in warnings_of(problems=problems)]

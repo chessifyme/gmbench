@@ -15,6 +15,9 @@ from bench.preregister import combine
 from bench.provenance import file_sha256
 
 TaskSet = Literal["public", "private", "folder"]
+# who ran it: the maintainers, the entrant's maker (self_reported, an entrant of entrants/), or the maker with a sample re-run by
+# the maintainers that agreed (verified, make verify_submission)
+Provenance = Literal["self_reported", "verified", "maintainer_run"]
 AttemptKind = Literal["attempt", "void"]
 
 
@@ -43,6 +46,8 @@ class RunMeta(BaseModel):
     tasks_dir: str | None = Field(default=None, exclude_if=lambda value: value is None)
     entrant_details: dict[str, str] | None = Field(default=None, exclude_if=lambda value: value is None)
     tasks_sha256: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    # none on the maintainers' runs, so their meta files stay unchanged; the board reads it with board_provenance
+    provenance: Provenance | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 def folder_tasks_sha256(*, tasks_dir: Path) -> str:
@@ -195,14 +200,61 @@ def void_attempt(*, ledger: Path, run_dir: Path, root: Path, reason: str) -> Att
 
 def start_run(*, meta: RunMeta, runs_dir: Path = RUNS_DIR, root: Path = ROOT, registrations_dir: Path = REGISTRATIONS_DIR) -> Path:
     """Create the run directory, write its metadata and, for a registered run, append an attempt to the dataset version's ledger.
-    A run recorded as not available asked no task (its client failed the probe), so it is no attempt and writes no line.
+    A run recorded as not available asked no task (its client failed the probe), so it is no attempt and writes no line; nor is a
+    self-reported run, which its maker started, not the maintainers.
     A registered run never starts from a tree with uncommitted governed files: it could never be published, yet it would count
     as the entrant's attempt."""
-    if meta.registration_sha256 is not None and meta.git_dirty is not False:
+    if meta.registration_sha256 is not None and meta.git_dirty is not False and meta.provenance is None:
         state = "has uncommitted changes" if meta.git_dirty else "was not checked for uncommitted changes"
         raise ValueError(f"the registered {meta.entrant} run cannot start: the tree of governed files {state}; commit them first (git status shows which), so the attempt is tied to a commit")
     run_dir = new_run_dir(entrant=meta.entrant, runs_dir=runs_dir)
     write_meta(meta=meta, run_dir=run_dir)
-    if meta.registration_sha256 is not None and meta.unavailable_reason is None:
+    if meta.registration_sha256 is not None and meta.unavailable_reason is None and meta.provenance is None:
         append_attempt(ledger=ledger_path(dataset_version=meta.dataset_version, registrations_dir=registrations_dir), meta=meta, run_dir=run_dir, root=root)
     return run_dir
+
+
+# the maintainers' record of every verification of a submitted run (make verify_submission), kept with the attempt ledger and never
+# inside a submitted folder: the first line for an entrant and dataset version decides, whatever folder it came from
+VERIFICATIONS_LEDGER = REGISTRATIONS_DIR / "verifications.jsonl"
+
+
+class VerificationLine(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    entrant: str
+    dataset_version: str
+    answers_sha256: str
+    passed: bool
+    needs_full_rerun: str | None = None
+    rerun_mean: float | None = None
+    submitted_mean: float | None = None
+    difference: float | None = None
+    standard_error: float | None = None
+    tolerance: float | None = None
+    sample: list[str] = []
+    seed: int | None = None
+    rerun_dir: str | None = None
+    verified_at: datetime
+
+
+def read_verifications(*, ledger: Path = VERIFICATIONS_LEDGER) -> list[VerificationLine]:
+    return [VerificationLine.model_validate(row) for row in read_jsonl(path=ledger)]
+
+
+def first_verification(*, lines: list[VerificationLine], entrant: str, dataset_version: str) -> VerificationLine | None:
+    return next((line for line in lines if line.entrant == entrant and line.dataset_version == dataset_version), None)
+
+
+def append_verification(*, line: VerificationLine, ledger: Path = VERIFICATIONS_LEDGER) -> None:
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    append_jsonl(path=ledger, record=line)
+
+
+def board_provenance(*, meta: RunMeta, answers_sha256: str, lines: list[VerificationLine], keeps_entrant_file: bool) -> Provenance:
+    """Who ran a run, as the board shows it. A run folder that keeps an entrant file (entrant.yaml or entrant.py) is a self-run
+    entrant's, never the maintainers', whatever its meta.json says. A submitted run is verified only when the ledger's first
+    verification of its entrant and dataset version passed on these very answers; it is self-reported otherwise."""
+    if not keeps_entrant_file and meta.provenance in (None, "maintainer_run"):
+        return "maintainer_run"
+    first = first_verification(lines=lines, entrant=meta.entrant, dataset_version=meta.dataset_version)
+    return "verified" if first is not None and first.passed and first.answers_sha256 == answers_sha256 else "self_reported"

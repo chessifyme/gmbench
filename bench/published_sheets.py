@@ -1,4 +1,4 @@
-"""The published form of a sheet (docs/review_app.md, "From working sheet to published key"): what data/public/sheets holds, the resolved answer key
+"""The published form of a sheet (docs/review_app.md, "From working sheet to published expert points"): what data/public/expert_points holds, the resolved expert points
 (bench.annotations.resolve) without the review app's working record, every reviewer under a pseudonym.
 
 A published sheet is a plain sheet: each claim with its text, kind, checkable fields, source, weight, duplicate link, idea link and drop, and
@@ -184,6 +184,33 @@ def _published_claim(*, claim: ReferenceClaim) -> ReferenceClaim:
     return claim.model_copy(update={"labels": _final_labels(claim=claim), "dropped": dropped, "weighted_by": None, "original_text": None, "source": published_source(source=claim.source)})
 
 
+def _unreviewed(*, claim: ReferenceClaim) -> bool:
+    return not claim.labels and claim.weight is None
+
+
+def unpublished_claim_ids(*, sheet: Sheet) -> frozenset[str]:
+    """The claims the published form leaves out, so nothing unreviewed is published: the model claims set aside unreviewed over the
+    per-task review limit (dropped by the cap, no label, no weight), and any unlabelled, unweighted claim whose duplicate_of leads to
+    one of them (a duplicate never names another duplicate, so there is no chain). Refused when a labelled or weighted claim, or any claim through same_idea_as,
+    would point at a claim left out."""
+    gone = {c.claim_id for c in sheet.claims if c.dropped is not None and c.dropped.annotator == CAP_ANNOTATOR and _unreviewed(claim=c)}
+    grew = True
+    while grew:
+        more = {c.claim_id for c in sheet.claims if c.claim_id not in gone and c.duplicate_of in gone and _unreviewed(claim=c)}
+        gone |= more
+        grew = bool(more)
+    dangling = [f"{c.claim_id} ({name} {getattr(c, name)})" for c in sheet.claims if c.claim_id not in gone for name in ("duplicate_of", "same_idea_as") if getattr(c, name) in gone]
+    if dangling:
+        raise PublishError(f"sheet {sheet.task_id}: {', '.join(dangling)} would point at a claim set aside unreviewed, which is not published")
+    return frozenset(gone)
+
+
+def without_unpublished(*, sheet: Sheet) -> Sheet:
+    """The sheet without the claims set aside unreviewed (unpublished_claim_ids); every other claim and its id unchanged."""
+    gone = unpublished_claim_ids(sheet=sheet)
+    return sheet.model_copy(update={"claims": [c for c in sheet.claims if c.claim_id not in gone]}) if gone else sheet
+
+
 def key_content(*, resolution: Resolution) -> dict[str, object]:
     """What grading and every consumer read of a resolved key: per claim its text, kind and fields, source (type and name), weight,
     duplicate link, idea link (same_idea_as), drop (its published comment), whether it holds true or awaits adjudication, each reviewer's final label and the ruling; the verdict, turning points,
@@ -208,7 +235,7 @@ def key_content(*, resolution: Resolution) -> dict[str, object]:
         "task_id": sheet.task_id,
         "verdict": sheet.verdict,
         "turning_points": [tp.model_dump() for tp in sheet.turning_points],
-        "answer_key": [c.claim_id for c in sheet.answer_key],
+        "expert_points": [c.claim_id for c in sheet.expert_points],
         "author": sorted(_signers(value=sheet.author)),
         "reviewed_by": sorted(_signers(value=sheet.reviewed_by)),
         "signed_on": _day(at=sheet.signed_at).date() if sheet.signed_at is not None else None,
@@ -216,6 +243,14 @@ def key_content(*, resolution: Resolution) -> dict[str, object]:
         "held_back": resolution.held_back is not None,
         "claims": claims,
     }
+
+
+def published_key_content(*, resolution: Resolution) -> dict[str, object]:
+    """key_content of a full sheet's resolution as its published form must give it: without the claims set aside unreviewed
+    (unpublished_claim_ids)."""
+    gone = unpublished_claim_ids(sheet=resolution.sheet)
+    content = key_content(resolution=resolution)
+    return {**content, "claims": [claim for claim in content["claims"] if claim["claim_id"] not in gone]}  # type: ignore[attr-defined,index]
 
 
 def published_sheet(*, sheet: Sheet, required: int, pseudonyms: Pseudonyms) -> Sheet:
@@ -238,12 +273,13 @@ def _published_form(*, sheet: Sheet, required: int, pseudonyms: Pseudonyms, unsh
     if resolution.held_back is not None:
         raise PublishError(f"sheet {sheet.task_id} is held back ({resolution.held_back}); it is published once its key is final")
     key = resolution.sheet
+    gone = unpublished_claim_ids(sheet=key)
     published = Sheet.model_validate(
         {
             "task_id": key.task_id,
             "verdict": key.verdict,
             "turning_points": [tp.model_dump() for tp in key.turning_points],
-            "claims": [_published_claim(claim=c).model_dump() for c in key.claims],
+            "claims": [_published_claim(claim=c).model_dump() for c in key.claims if c.claim_id not in gone],
             "last_claim_number": key.last_claim_number,
             "notes": "",
             "author": key.author,
@@ -251,6 +287,6 @@ def _published_form(*, sheet: Sheet, required: int, pseudonyms: Pseudonyms, unsh
             "signed_at": _day(at=key.signed_at) if key.signed_at is not None else None,
         }
     )
-    if key_content(resolution=resolve(sheet=published, required=required)) != key_content(resolution=resolution):
+    if key_content(resolution=resolve(sheet=published, required=required)) != published_key_content(resolution=resolution):
         raise PublishError(f"sheet {sheet.task_id}: the published form does not resolve to the same answer key as the full sheet")
     return published

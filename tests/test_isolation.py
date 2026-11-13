@@ -33,7 +33,7 @@ def _paths(tmp_path: Path) -> list[Path]:
 
 def test_protected_paths_cover_the_repository_its_secrets_and_data_the_private_set_and_the_home() -> None:
     paths = protected_paths(root=Path("/r"), private_dir=Path("/p"), home=Path("/h"))
-    assert [p.as_posix() for p in paths] == ["/r", "/r/.env", "/r/data/public/sheets", "/r/data/public/reference", "/r/runs", "/p", "/h"]
+    assert [p.as_posix() for p in paths] == ["/r", "/r/.env", "/r/data/public/expert_points", "/r/data/public/reference", "/r/runs", "/p", "/h"]
     assert Path("/p") not in protected_paths(root=Path("/r"), private_dir=None, home=Path("/h"))
 
 

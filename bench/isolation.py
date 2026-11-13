@@ -37,7 +37,7 @@ def needs_isolation(*, name: str, models: ModelsConfig) -> bool:
 
 
 def protected_paths(*, root: Path, private_dir: Path | None, home: Path) -> list[Path]:
-    return [root, root / ".env", root / "data" / "public" / "sheets", root / "data" / "public" / "reference", root / "runs", *([private_dir] if private_dir is not None else []), home]
+    return [root, root / ".env", root / "data" / "public" / "expert_points", root / "data" / "public" / "reference", root / "runs", *([private_dir] if private_dir is not None else []), home]
 
 
 def _as_entrant(*, user: str, argv: list[str]) -> list[str]:
