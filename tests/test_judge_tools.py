@@ -10,7 +10,7 @@ import pytest
 from bench.config import EngineEnv, LabelThresholds, load_bench
 from bench.engine import Engine
 from bench.engine import PositionAnalysis
-from bench.judge_tools import GM_TOOLS, GmClaim, reference_positions, EngineCache, JudgeToolbox, TaskPositions, ToolInputError, eval_band, moment_ply, move_tokens, parse_reference, PositionReference
+from bench.judge_tools import GAME_POSITION_TEXT, GM_TOOLS, POSITION_TEXT, RESULT_REFERENCE_NOTE, TOOL_NAMES, GmClaim, reference_positions, EngineCache, JudgeToolbox, TaskPositions, ToolInputError, eval_band, moment_ply, move_tokens, parse_reference, PositionReference, tool_specs
 from tests.grading_fakes import GR_TASK, MV_TASK
 from tests.judge_tool_fakes import BUDGET, CFG, ScriptedAnalyser, fen_after, line, toolbox
 
@@ -52,6 +52,100 @@ def test_a_reference_through_an_illegal_move_says_which_move() -> None:
     assert "move 2 (Qh3) is illegal" in str(result["error"])
 
 
+# what the tools say about naming a position, and the reference every result carries
+
+
+def _position_texts(*, specs: list[dict[str, object]]) -> dict[str, str]:
+    return {str(spec["function"]["name"]): str(spec["function"]["parameters"]["properties"]["position"]["description"]) for spec in specs if "position" in spec["function"]["parameters"]["properties"]}  # type: ignore[index]
+
+
+def test_every_position_parameter_says_the_tasks_own_forms_and_that_a_fen_is_refused() -> None:
+    for task, own, other in ((MV_TASK, POSITION_TEXT, "game:"), (GR_TASK, GAME_POSITION_TEXT, "after:")):
+        positions = TaskPositions.for_task(task=task)
+        texts = _position_texts(specs=toolbox(task=task).tool_specs())
+        assert set(texts) == {"play", "board", "evaluate", "judge_move"} and set(texts.values()) == {positions.position_text}
+        assert positions.position_text.startswith(own) and "Not a FEN: a FEN is refused" in positions.position_text and other not in positions.position_text
+    assert '"after: 13. cxd5 Nxd5"' in POSITION_TEXT and '"task"' in POSITION_TEXT and "game:" not in POSITION_TEXT
+    assert '"game: 23... then: Qh5 g6"' in GAME_POSITION_TEXT and '"task"' not in GAME_POSITION_TEXT
+
+
+def test_every_tool_that_takes_a_position_says_its_results_carry_a_reference_to_pass_back() -> None:
+    specs = tool_specs(positions=TaskPositions.for_task(task=MV_TASK))
+    assert [spec["function"]["name"] for spec in specs] == list(TOOL_NAMES)  # type: ignore[index]
+    for spec in specs:
+        function = spec["function"]
+        takes_position = "position" in function["parameters"]["properties"]  # type: ignore[index]
+        assert function["description"].endswith(RESULT_REFERENCE_NOTE) == takes_position  # type: ignore[index]
+
+
+def test_every_result_names_its_position_by_a_reference_that_gives_back_the_same_position() -> None:
+    analyser = ScriptedAnalyser(
+        lines={MV_FEN: [line(rank=1, san="Na5", cp=-20), line(rank=2, san="Nxd5", cp=40)], fen_after(fen=MV_FEN, sans=["Nxd5"]): [line(rank=1, san="Nxf7", cp=60)]},
+    )
+    box = toolbox(task=MV_TASK, analyser=analyser)
+    played = box.call(name="play", arguments={"position": "after:  5...Nxd5", "moves": "6.Nxf7 Kxf7 Qf3+"})
+    assert played["reference"] == "after: 5... Nxd5" and played["end"]["reference"] == "after: 5... Nxd5 6. Nxf7 Kxf7 7. Qf3+"  # type: ignore[index]
+    assert [m["reference_after"] for m in played["moves"]] == ["after: 5... Nxd5 6. Nxf7", "after: 5... Nxd5 6. Nxf7 Kxf7", "after: 5... Nxd5 6. Nxf7 Kxf7 7. Qf3+"]  # type: ignore[union-attr,index]
+    named = [(played["reference"], played["fen"]), (played["end"]["reference"], played["end"]["fen"])] + [(m["reference_after"], m["fen_after"]) for m in played["moves"]]  # type: ignore[index,union-attr]
+    for reference, fen in named:
+        assert box.call(name="board", arguments={"position": str(reference)})["fen"] == fen
+    for name, arguments in (("board", {"position": "task"}), ("evaluate", {"position": "task"}), ("judge_move", {"position": "task", "move": "Nxd5"}), ("evaluate", {"position": "after: Nxd5"})):
+        result = box.call(name=name, arguments=arguments)
+        assert box.call(name="board", arguments={"position": str(result["reference"])})["fen"] == result["fen"]
+    assert box.call(name="evaluate", arguments={"position": "after: Nxd5"})["reference"] == "after: 5... Nxd5"
+
+
+def test_a_played_line_stopped_by_an_illegal_move_names_the_position_it_reached() -> None:
+    played = toolbox(task=MV_TASK).call(name="play", arguments={"position": "task", "moves": "Nxd5 Nxf7 Qh3"})
+    assert played["illegal"] is not None and played["end"]["reference"] == "after: 5... Nxd5 6. Nxf7"  # type: ignore[index]
+
+
+def test_game_review_results_name_positions_by_game_moment() -> None:
+    box = toolbox(task=GR_TASK)
+    at = box.call(name="game_position", arguments={"move": "17"})
+    assert (at["reference"], at["reference_after"]) == ("game: 9.", "game: 9...")
+    assert box.call(name="board", arguments={"position": "game: 9..."})["fen"] == at["fen_after"]
+    played = box.call(name="play", arguments={"position": "game: 10.", "moves": "Nxb5"})
+    assert played["reference"] == "game: 10." and played["end"]["reference"] == "game: 10. then: 10. Nxb5"  # type: ignore[index]
+    assert box.call(name="board", arguments={"position": "game: 10. then: 10. Nxb5"})["fen"] == played["end"]["fen"]  # type: ignore[index]
+    assert box.call(name="board", arguments={"position": "game: 19"})["reference"] == "game: 10."
+    assert box.call(name="game_position", arguments={"move": "34"})["reference_after"] is None
+
+
+def test_a_typed_fen_is_still_refused_and_the_refusal_names_the_reference_to_use_when_the_tools_named_that_position() -> None:
+    box = toolbox(task=MV_TASK)
+    unknown = box.call(name="board", arguments={"position": fen_after(fen=chess.STARTING_FEN, sans=["e4"])})
+    assert "never as a FEN" in str(unknown["error"]) and '"after: <moves in SAN from the task position>"' in str(unknown["error"]) and "game:" not in str(unknown["error"])
+    assert str(box.call(name="evaluate", arguments={"position": MV_FEN})["error"]).endswith('that position is one the tools named: pass "task"')
+    end = box.call(name="play", arguments={"position": "task", "moves": "Nxd5 Nxf7"})["end"]
+    typed = box.call(name="board", arguments={"position": f"FEN: {end['fen']}"})  # type: ignore[index]
+    assert "never as a FEN" in str(typed["error"]) and str(typed["error"]).endswith('that position is one the tools named: pass "after: 5... Nxd5 6. Nxf7"')
+    fields = str(end["fen"]).split()  # type: ignore[index]
+    assert str(box.call(name="board", arguments={"position": " ".join(fields[:3])})["error"]).endswith('that position is one the tools named: pass "after: 5... Nxd5 6. Nxf7"')
+    # a partial FEN (placement alone, or placement and side) gets the generic help
+    for partial in (fields[0], " ".join(fields[:2])):
+        refused = str(box.call(name="board", arguments={"position": partial})["error"])
+        assert "the tools named" not in refused and '"after: <moves in SAN from the task position>"' in refused
+    wrong_side = " ".join([fields[0], "w", *fields[2:]])
+    assert "the tools named" not in str(box.call(name="board", arguments={"position": wrong_side})["error"])
+
+
+def test_a_typed_fen_suggests_only_the_position_its_castling_rights_name() -> None:
+    box = toolbox(task=START_TASK)
+    # the rook's trip costs White the kingside castling: the starting board again, but another position
+    end = box.call(name="play", arguments={"position": "task", "moves": "Nf3 Nf6 Rg1 Ng8 Rh1 Nf6 Ng1 Ng8"})["end"]
+    assert str(end["fen"]).split()[:3] == [chess.STARTING_FEN.split()[0], "w", "Qkq"]  # type: ignore[index]
+    # placement, side and castling tell the two apart; with en passant left out they still do
+    assert str(box.call(name="board", arguments={"position": " ".join(chess.STARTING_FEN.split()[:3])})["error"]).endswith('pass "task"')
+    assert str(box.call(name="board", arguments={"position": chess.STARTING_FEN})["error"]).endswith('that position is one the tools named: pass "task"')
+    assert str(box.call(name="board", arguments={"position": str(end["fen"])})["error"]).endswith('that position is one the tools named: pass "after: 1. Nf3 Nf6 2. Rg1 Ng8 3. Rh1 Nf6 4. Ng1 Ng8"')  # type: ignore[index]
+
+
+def test_a_game_review_refusal_lists_the_game_forms_only() -> None:
+    refused = str(toolbox(task=GR_TASK).call(name="board", arguments={"position": "the starting position"})["error"])
+    assert '"game: <moment>"' in refused and '"task"' not in refused and "after:" not in refused
+
+
 # play
 
 
@@ -62,7 +156,7 @@ def test_play_replays_a_legal_line_with_pieces_captures_checks_and_the_position_
     assert [m["captures"] for m in moves] == ["pawn", "pawn", "knight", None]
     assert [m["check"] for m in moves] == [False, False, False, True] and moves[0]["piece"] == "knight" and moves[2]["piece"] == "king"
     assert moves[3]["fen_after"] == fen_after(fen=MV_FEN, sans=["Nxd5", "Nxf7", "Kxf7", "Qf3+"])
-    assert result["illegal"] is None and result["end"] == {"fen": moves[3]["fen_after"], "check": True, "checkmate": False, "stalemate": False}
+    assert result["illegal"] is None and result["end"] == {"fen": moves[3]["fen_after"], "reference": "after: 5... Nxd5 6. Nxf7 Kxf7 7. Qf3+", "check": True, "checkmate": False, "stalemate": False}
     assert all(m["notation_problem"] is None for m in moves)
 
 
@@ -375,8 +469,8 @@ def test_evaluate_board_and_judge_move_on_answer_for_a_board_as_the_tools_answer
     analyser = ScriptedAnalyser(lines={MV_FEN: [line(rank=1, san="Na5", cp=-20), line(rank=2, san="Nd4", cp=10)]}, moves={(MV_FEN, "f6d5"): line(rank=1, san="Nxd5", cp=480)})
     box = toolbox(task=MV_TASK, analyser=analyser)
     board = chess.Board(MV_FEN)
-    assert box.evaluate_board(board=board, position="task") == box.call(name="evaluate", arguments={"position": "task"})
-    assert box.judge_move_on(board=board, position="task", move="Nxd5") == box.call(name="judge_move", arguments={"position": "task", "move": "Nxd5"})
+    assert box.evaluate_board(board=board, position="task", reference="task") == box.call(name="evaluate", arguments={"position": "task"})
+    assert box.judge_move_on(board=board, position="task", move="Nxd5", reference="task") == box.call(name="judge_move", arguments={"position": "task", "move": "Nxd5"})
     assert board.fen() == MV_FEN
     mated = chess.Board(fen_after(fen=chess.STARTING_FEN, sans=["e4", "e5", "Bc4", "Nc6", "Qh5", "Nf6", "Qxf7#"]))
     with pytest.raises(ToolInputError, match="the game is over"):

@@ -19,6 +19,8 @@ _TOKEN = re.compile(rf"(?<![A-Za-z0-9])(\d{{1,3}})(\.\.\.|\.)(?=\s*{_SAN})|(?<![
 _BARE_SQUARE = re.compile(r"^[a-h][0-9]$")
 _IMPOSSIBLE_SQUARE = re.compile(r"[a-h][09]")
 _LONG_RE = re.compile(rf"^{_LONG}$")
+_READABLE = re.compile(rf"^(?:{_SAN})$")
+_MOVE_NUMBER = re.compile(r"^(?:\d{1,3}\s*)?(?:\.\s*\.\.\.|\.\.\.|\u2026|\.)\s*")
 
 
 @dataclass(frozen=True)
@@ -62,8 +64,16 @@ class MoveCheckResult:
 
 
 def normalise_san(*, token: str) -> str:
-    san = token.rstrip("!?+#")
+    """A move as written, without a leading move number or dots ("23...Qh3", "...Qh3", "23. Qh3"), its trailing full stop, comma,
+    check or mate sign and annotation ("Bxh6." "Nf3!?" "Qh7+!" "Qh3,"), figurines read as letters, castling with letter O."""
+    san = _MOVE_NUMBER.sub("", token.strip().translate(FIGURINES).lstrip("(")).rstrip(".!?+#,;:)")
     return san.replace("0-0-0", "O-O-O").replace("0-0", "O-O")
+
+
+def readable_san(*, token: str) -> bool:
+    """Whether a move reads as chess notation at all (SAN, or a long form such as e2e4 or Ng1-f3), legal or not: "exf5#INVALID"
+    or a word does not. A move that reads but names a square off the board (Ra9) reads; it is illegal, not unreadable."""
+    return bool(_READABLE.match(normalise_san(token=token)))
 
 
 def _tokens(text: str) -> list[tuple[str, int, int, int | None, bool]]:
@@ -80,6 +90,18 @@ def _expected_marker(*, start_move_number: int, black_starts: bool, moves_so_far
     if black_starts:
         return start_move_number + (moves_so_far + 1) // 2, moves_so_far % 2 == 0
     return start_move_number + moves_so_far // 2, moves_so_far % 2 == 1
+
+
+def written_moves(*, text: str) -> list[str]:
+    """Every move the text writes in chess notation, in or out of a numbered sequence, as normalise_san gives it."""
+    plain = text.translate(FIGURINES)
+    return [normalise_san(token=plain[begin:end]) for kind, begin, end, _, _ in _tokens(plain) if kind == "san"]
+
+
+def written_move_spans(*, text: str) -> list[tuple[str, int, int]]:
+    """Every move the text writes in chess notation, as normalise_san gives it, with where it is written (its annotation included)."""
+    plain = text.translate(FIGURINES)
+    return [(normalise_san(token=plain[begin:end]), begin, end) for kind, begin, end, _, _ in _tokens(plain) if kind == "san"]
 
 
 def find_lines(*, text: str) -> list[MoveLine]:

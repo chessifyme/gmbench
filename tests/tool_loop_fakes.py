@@ -45,11 +45,13 @@ class ScriptedToolModel:
         self.requests: list[list[dict[str, object]]] = []
         self.timeouts: list[float] = []
         self.offered: list[list[str]] = []
+        self.specs: list[list[dict[str, object]]] = []
         self.on_turn = on_turn
 
     def tool_turn(self, *, messages: list[dict[str, object]], tools: list[dict[str, object]], timeout_s: float) -> ToolTurn:
         self.requests.append(list(messages))
         self.offered.append([str(spec["function"]["name"]) for spec in tools])  # type: ignore[index]
+        self.specs.append(list(tools))
         self.timeouts.append(timeout_s)
         if self.on_turn is not None:
             self.on_turn()

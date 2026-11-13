@@ -1,1 +1,1 @@
-GRADER_VERSION = "v1_rc38"
+GRADER_VERSION = "v1_rc40"

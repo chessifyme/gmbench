@@ -21,6 +21,8 @@ You never type a position. Name it by reference, and the tool finds it:
 - `game: 23...`: in a game review, the position where Black played move 23 (`game: 23.` for White's move 23, or a ply number).
 - `game: 23... then: Qh5 g6`: that game position, then these moves.
 
+Never pass a FEN: a FEN is refused. Every tool result names the positions it shows by a `reference` (in `play`, `end.reference` for the end of the line and `reference_after` for each move), the exact text to pass back as `position`.
+
 A claim about a move under discussion is about the task position; a claim about the position after it is about `after: <that move>`.
 
 When to use the tools

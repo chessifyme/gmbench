@@ -1,5 +1,6 @@
 """The grader's claim check: every extracted claim, exactly as extracted, is placed on its positions by code (a line or move legal
-from neither the task position nor after the task's move is an illegal move), then each claim judge of the panel calls the chess
+from neither the task position nor after the task's move is an illegal move, unless it does not read as chess, leaves out a reply
+or is one the claim itself calls illegal: then it is unverifiable), then each claim judge of the panel calls the chess
 tools and the task's grandmaster-labelled claims (bench/judge_tools.py), gives each claim true, false or unverifiable and cites
 the calls it relies on, and code checks every citation (bench/verify/citations.py). With more than one claim judge a claim's
 verdict is the checked verdict more than half of the panel give."""
@@ -22,8 +23,8 @@ from bench.llm import ChatModel
 from bench.paths import PROMPTS_DIR
 from bench.reference import Reference
 from bench.verify.citations import MATE_SLACK, check_citations
-from bench.verify.positions import place
-from bench.verify.schema import ILLEGAL_PLACEMENT, CheckedClaims, Citation, ClaimResult, InputClaim, JudgeClaimVerdict, JudgeRun, Strict, Subject
+from bench.verify.positions import place, unplaced_reason
+from bench.verify.schema import ILLEGAL_PLACEMENT, CheckedClaims, Citation, ClaimResult, ClaimVerdict, InputClaim, JudgeClaimVerdict, JudgeRun, Strict, Subject
 
 CLAIM_FIELDS = ("kind", "text", "move", "band", "line", "outcome", "mate_in", "side", "about", "moment", "checkable")
 NO_ANSWER_TEXT = "(not available: only the claims below are known; judge each claim on its own words)"
@@ -220,17 +221,29 @@ def _threat_unplaced_detail(*, placement: str) -> str:
     return f"a threat is placed by its move alone, often written without the moves before it: {placement}"
 
 
-def _unplaced_threat(*, result: ClaimResult) -> ClaimResult:
-    if result.claim.kind != "threat" or result.verdict != ILLEGAL_PLACEMENT:
+def unplaced_verdict(*, claim: InputClaim, placement: str, subject: Subject, answer_text: str | None) -> tuple[ClaimVerdict, str]:
+    """The verdict code gives a claim `place` could not place, with why: a threat is unverifiable (often written without the moves
+    before it), and so is a claim whose move does not read as chess, whose line leaves out a reply, or whose move the claim
+    itself calls illegal (`unplaced_reason`); any other is an illegal move."""
+    if claim.kind == "threat":
+        return "unverifiable", _threat_unplaced_detail(placement=placement)
+    reason = unplaced_reason(subject=subject, claim=claim, answer_text=answer_text)
+    return ("unverifiable", reason) if reason is not None else (ILLEGAL_PLACEMENT, placement)
+
+
+def _unplaced(*, result: ClaimResult, subject: Subject, answer_text: str | None) -> ClaimResult:
+    if result.verdict != ILLEGAL_PLACEMENT:
         return result
-    return result.model_copy(update={"verdict": "unverifiable", "detail": _threat_unplaced_detail(placement=result.detail)})
+    verdict, detail = unplaced_verdict(claim=result.claim, placement=result.detail, subject=subject, answer_text=answer_text)
+    return result if verdict == ILLEGAL_PLACEMENT else result.model_copy(update={"verdict": verdict, "detail": detail})
 
 
-def recheck(*, checked: CheckedClaims, subject: Subject, cfg: BenchConfig, reference: Reference | None, gm: tuple[GmClaim, ...]) -> CheckedClaims:
+def recheck(*, checked: CheckedClaims, subject: Subject, cfg: BenchConfig, reference: Reference | None, gm: tuple[GmClaim, ...], answer_text: str | None = None) -> CheckedClaims:
     """The stored judge verdicts and citations checked again by the current citation check, each judge's from the tool calls
     stored with it, and the grandmaster labels as the sheet holds them now; a panel's majority is taken again. No model or
-    engine is called. A threat stored as an illegal move (by an earlier grader) becomes unverifiable, as the check now decides it."""
-    checked = checked.model_copy(update={"results": [_unplaced_threat(result=r) for r in checked.results]})
+    engine is called. A claim stored as an illegal move (by an earlier grader) is ruled again by `unplaced_verdict` on the answer
+    text: a threat, an unreadable move, a line that leaves out a reply, or a move the claim calls illegal becomes unverifiable."""
+    checked = checked.model_copy(update={"results": [_unplaced(result=r, subject=subject, answer_text=answer_text) for r in checked.results]})
     if checked.judge_runs:
         runs = {key: _stored_run(calls=run.tool_calls, stopped=run.stopped, subject=subject, cfg=cfg, reference=reference, gm=gm) for key, run in checked.judge_runs.items()}
         results = []
@@ -310,10 +323,8 @@ class ToolChecker:
             placement = place(subject=subject, claim=claim)
             if isinstance(placement, str):
                 pid = registry.add(board=chess.Board(subject.fen))
-                if claim.kind == "threat":
-                    decided[claim.claim_id] = _by_code(claim=claim, verdict="unverifiable", detail=_threat_unplaced_detail(placement=placement), ids=[pid])
-                else:
-                    decided[claim.claim_id] = _by_code(claim=claim, verdict=ILLEGAL_PLACEMENT, detail=placement, ids=[pid])
+                verdict, detail = unplaced_verdict(claim=claim, placement=placement, subject=subject, answer_text=answer_text)
+                decided[claim.claim_id] = _by_code(claim=claim, verdict=verdict, detail=detail, ids=[pid])
                 continue
             ids = [registry.add(board=board) for board, _ in placement.boards]
             to_judge.append((claim, ids, placement.moved, placement.move_board))

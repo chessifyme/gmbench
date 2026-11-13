@@ -6,18 +6,18 @@ import chess
 import pytest
 
 from bench.adapters.base import AnswerRecord
-from bench.adapters.chess_tools import ENTRANT_TOOL_SPECS, ChessToolsAdapter, chess_tools_system_prompt
+from bench.adapters.chess_tools import ENTRANT_TOOL_SPECS, ChessToolsAdapter, chess_tools_system_prompt, entrant_tool_specs
 from bench.adapters.prompts import NEUTRAL_SYSTEM_PROMPT, render_user_message
 from bench.adapters.registry import get_adapter
 from bench.config import load_models
 from bench.grading.grade import grade_answer
 from bench.grading.tool_loop import cap_message
-from bench.judge_tools import BASIC_TOOLS
+from bench.judge_tools import BASIC_TOOLS, GAME_POSITION_TEXT, POSITION_TEXT, RESULT_REFERENCE_NOTE, TaskPositions
 from bench.llm import LLMTransportError
 from bench.paths import DATA_PUBLIC_REFERENCE, DATA_PUBLIC_SHEETS
 from bench.aggregate import aggregate
 from bench.publish_check import GateFailure, tool_trace_access
-from tests.grading_fakes import MV_REF, MV_TASK
+from tests.grading_fakes import GR_TASK, MV_REF, MV_TASK
 from tests.judge_tool_fakes import BUDGET, CFG, ScriptedAnalyser, line
 from tests.test_grade import _extractor, _extractors, _judges, _sheet
 from tests.tool_loop_fakes import SERVED_MODEL, ScriptedToolModel, answers, asks, raises
@@ -71,7 +71,21 @@ def test_the_tool_calls_are_run_on_the_task_and_traced_with_the_answer() -> None
     assert model.offered == [list(BASIC_TOOLS), list(BASIC_TOOLS)]
     system, user = model.requests[0][0]["content"], model.requests[0][1]["content"]
     assert system == chess_tools_system_prompt() and system.startswith(NEUTRAL_SYSTEM_PROMPT) and user == render_user_message(task=MV_TASK)
-    assert all(f"- {name}: " in system for name in BASIC_TOOLS) and "gm_" not in system and "reference" not in system.lower()
+    assert all(f"- {name}: " in system for name in BASIC_TOOLS) and "gm_" not in system and "reference analysis" not in system.lower() and "published" not in system.lower()
+
+
+def test_the_entrant_is_offered_its_tasks_position_text_on_every_position_parameter_and_told_results_carry_a_reference() -> None:
+    model = ClosingModel(asks(("play", {"position": "task", "moves": "Nxd5 Nxf7"})), answers(ANSWER))
+    record = _adapter(model=model, analyser=_lines()).answer(task=MV_TASK, run_index=0, timeout_s=900)
+    assert model.specs[0] == entrant_tool_specs(positions=TaskPositions.for_task(task=MV_TASK)) == ENTRANT_TOOL_SPECS
+    for task, own in ((MV_TASK, POSITION_TEXT), (GR_TASK, GAME_POSITION_TEXT)):
+        specs = entrant_tool_specs(positions=TaskPositions.for_task(task=task))
+        texts = {str(spec["function"]["parameters"]["properties"]["position"]["description"]) for spec in specs}  # type: ignore[index]
+        assert len(specs) == len(BASIC_TOOLS) and texts == {TaskPositions.for_task(task=task).position_text} and next(iter(texts)).startswith(own)
+        assert all(str(spec["function"]["description"]).endswith(RESULT_REFERENCE_NOTE) for spec in specs)  # type: ignore[index]
+    assert all(f"- {name}: " in chess_tools_system_prompt() for name in BASIC_TOOLS) and chess_tools_system_prompt().count(RESULT_REFERENCE_NOTE) == len(BASIC_TOOLS)
+    end = record.raw["tool_trace"][0]["result"]["end"]  # type: ignore[index]
+    assert end["reference"] == "after: 5... Nxd5 6. Nxf7"
 
 
 def test_the_tools_name_no_grading_rule_and_return_no_band_or_verdict() -> None:

@@ -4,12 +4,12 @@ import httpx
 import pytest
 
 from bench.grading.tool_loop import PromptedToolCalls, cap_message, run_tool_loop, tool_caller
-from bench.judge_tools import TOOL_SPECS, GmClaim
+from bench.judge_tools import TOOL_NAMES, TOOL_SPECS, GmClaim, TaskPositions, tool_specs
 from pathlib import Path
 
 from bench.llm import ClaudeCli, CodexCli, CommandResult, LLMAnswerRefused, LLMFormatError, LLMQuotaExhausted, LLMRequestRejected, LLMTransportError
 from tests.llm_fakes import claude_result
-from tests.grading_fakes import MV_TASK
+from tests.grading_fakes import GR_TASK, MV_TASK
 from tests.judge_tool_fakes import ScriptedAnalyser, line, toolbox
 from tests.test_llm_openrouter import FakeOpenRouter
 from tests.tool_loop_fakes import Clock, ScriptedToolModel, answers, asks, raises, times_out
@@ -21,6 +21,13 @@ EVAL = ("evaluate", {"position": "task"})
 
 def _box() -> object:
     return toolbox(task=MV_TASK, analyser=ScriptedAnalyser(lines={MV_FEN: [line(rank=1, san="Na5", cp=-20)]}))
+
+
+def test_the_judge_is_offered_every_tool_with_its_tasks_own_position_text() -> None:
+    for task in (MV_TASK, GR_TASK):
+        model = ScriptedToolModel(answers('{"claims": []}'))
+        run_tool_loop(model=model, system="s", user="u", toolbox=toolbox(task=task), max_calls=15, timeout_s=60)  # type: ignore[arg-type]
+        assert model.specs == [tool_specs(positions=TaskPositions.for_task(task=task))] and model.offered == [list(TOOL_NAMES)]
 
 
 def test_the_loop_answers_each_call_with_the_tools_result_and_records_it() -> None:
