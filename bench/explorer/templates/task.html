@@ -40,7 +40,7 @@
 <p class="hint">What a good answer should say, weighted by the experts. Points that say the same idea are shown together and count once. Click a line to play it on the board.</p>
 {% for section in view.sections %}
 <h3 class="weight-head w{{ section.weight }}"><span class="weight w{{ section.weight }}">{{ section.weight }}</span> {{ section.words }}</h3>
-<ul class="points">
+<ul class="points w{{ section.weight }}">
 {% for group in section.groups %}
 <li class="group{% if group.points | length > 1 %} same-idea{% endif %}">
 {% for point in group.points %}
